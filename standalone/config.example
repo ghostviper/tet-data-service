@@ -1,0 +1,49 @@
+# TET Data Service Configuration Example
+# 复制此文件为 config.txt 并编辑相关配置
+
+# ===================
+# Binance API 配置
+# ===================
+# 在 https://www.binance.com/zh-CN/my/settings/api-management 获取
+BINANCE_API_KEY=your_binance_api_key_here
+BINANCE_SECRET_KEY=your_binance_secret_key_here
+
+# ===================
+# Redis 配置
+# ===================
+# Redis服务器地址和端口
+REDIS_ADDR=localhost:6379
+# Redis密码（如果没有设置密码则留空）
+REDIS_PASSWORD=
+# Redis数据库编号
+REDIS_DB=1
+
+# ===================
+# 更新配置
+# ===================
+# 数据更新间隔（秒）- 建议180秒（3分钟）
+UPDATE_INTERVAL=180
+# 并发请求数量 - 根据服务器性能调整
+CONCURRENT_REQUESTS=12
+# 数据最大过期时间（秒）
+MAX_DATA_AGE=540
+# API每秒请求限制
+API_REQUESTS_PER_SEC=15
+# K线时间框架：15m, 30m, 1h, 2h, 4h, 1d
+TIMEFRAME=15m
+# 保留历史数据天数
+DATA_DAYS=30
+
+# ===================
+# 交易对配置
+# ===================
+# 自定义交易对列表（用逗号分隔，留空使用默认列表）
+# SYMBOLS=BTC/USDT,ETH/USDT,BNB/USDT,XRP/USDT,ADA/USDT
+
+# ===================
+# 性能配置
+# ===================
+# 批处理大小
+BATCH_SIZE=15
+# 日志级别：debug, info, warn, error
+LOG_LEVEL=info
