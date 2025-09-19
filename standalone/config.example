@@ -4,9 +4,8 @@
 # ===================
 # Binance API 配置
 # ===================
-# 在 https://www.binance.com/zh-CN/my/settings/api-management 获取
-BINANCE_API_KEY=your_binance_api_key_here
-BINANCE_SECRET_KEY=your_binance_secret_key_here
+# 公共行情数据无需 API 密钥
+BINANCE_BASE_URL=https://api.binance.com
 
 # ===================
 # Redis 配置

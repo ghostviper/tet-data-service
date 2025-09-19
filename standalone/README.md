@@ -39,9 +39,8 @@ cp config.example config.txt
 
 编辑 `config.txt` 文件，设置必要的配置：
 ```ini
-# 必须设置的 Binance API 凭据
-BINANCE_API_KEY=你的API密钥
-BINANCE_SECRET_KEY=你的密钥密码
+# Binance 接口（公共行情数据无需密钥）
+BINANCE_BASE_URL=https://api.binance.com
 
 # Redis 连接（默认本地）
 REDIS_ADDR=localhost:6379
@@ -73,25 +72,23 @@ chmod +x run.sh
 
 **Windows:**
 ```bash
-tet-data-service-windows-amd64.exe --api-key=你的密钥 --secret-key=你的密码
+tet-data-service-windows-amd64.exe
 ```
 
 **Linux:**
 ```bash
-./tet-data-service-linux-amd64 --api-key=你的密钥 --secret-key=你的密码
+./tet-data-service-linux-amd64
 ```
 
 **macOS:**
 ```bash
-./tet-data-service-darwin-amd64 --api-key=你的密钥 --secret-key=你的密码
+./tet-data-service-darwin-amd64
 ```
 
 ## 命令行参数
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `--api-key` | - | Binance API Key (必需) |
-| `--secret-key` | - | Binance Secret Key (必需) |
 | `--redis` | localhost:6379 | Redis 服务器地址 |
 | `--redis-db` | 1 | Redis 数据库编号 |
 | `--interval` | 180 | 更新间隔（秒） |
@@ -106,14 +103,12 @@ tet-data-service-windows-amd64.exe --api-key=你的密钥 --secret-key=你的密
 
 ```bash
 # Windows
-set BINANCE_API_KEY=你的密钥
-set BINANCE_SECRET_KEY=你的密码
 set REDIS_ADDR=localhost:6379
+set TIMEFRAME=15m
 
 # Linux/macOS
-export BINANCE_API_KEY=你的密钥
-export BINANCE_SECRET_KEY=你的密码
 export REDIS_ADDR=localhost:6379
+export TIMEFRAME=15m
 ```
 
 ## 使用示例
@@ -125,8 +120,6 @@ export REDIS_ADDR=localhost:6379
 
 # 使用命令行参数
 ./tet-data-service-linux-amd64 \
-  --api-key=你的密钥 \
-  --secret-key=你的密码 \
   --redis=localhost:6379 \
   --interval=120
 ```
@@ -135,8 +128,6 @@ export REDIS_ADDR=localhost:6379
 ```bash
 # 自定义交易对和更新频率
 ./tet-data-service-linux-amd64 \
-  --api-key=你的密钥 \
-  --secret-key=你的密码 \
   --symbols="BTC/USDT,ETH/USDT,BNB/USDT" \
   --interval=60 \
   --concurrent=20 \
@@ -147,8 +138,6 @@ export REDIS_ADDR=localhost:6379
 ```bash
 # 连接到远程 Redis 服务器
 ./tet-data-service-linux-amd64 \
-  --api-key=你的密钥 \
-  --secret-key=你的密码 \
   --redis=192.168.1.100:6379 \
   --redis-db=2
 ```
@@ -184,9 +173,8 @@ Type=simple
 User=your-user
 WorkingDirectory=/path/to/tet-data-service
 ExecStart=/path/to/tet-data-service/tet-data-service-linux-amd64
-Environment=BINANCE_API_KEY=你的密钥
-Environment=BINANCE_SECRET_KEY=你的密码
 Environment=REDIS_ADDR=localhost:6379
+Environment=TIMEFRAME=15m
 Restart=always
 RestartSec=5
 
@@ -241,21 +229,17 @@ GET tet:system:status
 
 ### 常见问题
 
-1. **API 密钥错误**
-   - 确保 API 密钥和密码正确
-   - 检查 Binance API 权限设置
-
-2. **Redis 连接失败**
+1. **Redis 连接失败**
    - 确保 Redis 服务正在运行
    - 检查 Redis 地址和端口
    - 验证 Redis 访问权限
 
-3. **网络连接问题**
+2. **网络连接问题**
    - 检查网络连接到 Binance API
    - 确认防火墙设置
    - 如果在中国大陆，可能需要使用代理
 
-4. **权限问题**
+3. **权限问题**
    - 确保可执行文件有执行权限
    - Linux/macOS 用户运行: `chmod +x tet-data-service-*`
 
@@ -263,7 +247,7 @@ GET tet:system:status
 
 添加详细日志输出：
 ```bash
-./tet-data-service-linux-amd64 --api-key=你的密钥 --secret-key=你的密码 -v
+./tet-data-service-linux-amd64 -v
 ```
 
 ## 性能优化

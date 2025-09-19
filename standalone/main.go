@@ -2,9 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -28,9 +25,7 @@ import (
 
 // 配置结构
 type Config struct {
-	BinanceAPIKey    string
-	BinanceSecretKey string
-	BinanceBaseURL   string
+	BinanceBaseURL string
 
 	RedisAddr     string
 	RedisPassword string
@@ -101,8 +96,6 @@ type DataService struct {
 func main() {
 	// 命令行参数
 	var (
-		apiKey       = flag.String("api-key", "", "Binance API Key")
-		secretKey    = flag.String("secret-key", "", "Binance Secret Key")
 		redisAddr    = flag.String("redis", "localhost:6379", "Redis address")
 		redisDB      = flag.Int("redis-db", 1, "Redis database")
 		interval     = flag.Int("interval", 180, "Update interval in seconds")
@@ -115,12 +108,7 @@ func main() {
 	flag.Parse()
 
 	// 加载配置
-	cfg := loadConfig(*configFile, *apiKey, *secretKey, *redisAddr, *redisDB, *interval, *concurrent, *maxAge, *timeframe, *symbolsFlag)
-
-	// 验证配置
-	if cfg.BinanceAPIKey == "" || cfg.BinanceSecretKey == "" {
-		log.Fatal("Binance API Key and Secret Key are required")
-	}
+	cfg := loadConfig(*configFile, *redisAddr, *redisDB, *interval, *concurrent, *maxAge, *timeframe, *symbolsFlag)
 
 	// 创建服务
 	service := NewDataService(cfg)
@@ -165,7 +153,8 @@ func main() {
 	log.Printf("TET Data Service stopped")
 }
 
-func loadConfig(configFile, apiKey, secretKey, redisAddr string, redisDB, interval, concurrent, maxAge int, timeframe, symbolsFlag string) *Config {
+func loadConfig(configFile, redisAddr string, redisDB, interval, concurrent, maxAge int, timeframe, symbolsFlag string) *Config {
+	_ = configFile
 	cfg := &Config{
 		BinanceBaseURL:     "https://api.binance.com",
 		UpdateInterval:     time.Duration(interval) * time.Second,
@@ -177,19 +166,6 @@ func loadConfig(configFile, apiKey, secretKey, redisAddr string, redisDB, interv
 		BatchSize:          15,
 		RedisAddr:          redisAddr,
 		RedisDB:            redisDB,
-	}
-
-	// 从环境变量或命令行参数获取API密钥
-	if apiKey != "" {
-		cfg.BinanceAPIKey = apiKey
-	} else {
-		cfg.BinanceAPIKey = os.Getenv("BINANCE_API_KEY")
-	}
-
-	if secretKey != "" {
-		cfg.BinanceSecretKey = secretKey
-	} else {
-		cfg.BinanceSecretKey = os.Getenv("BINANCE_SECRET_KEY")
 	}
 
 	cfg.RedisPassword = os.Getenv("REDIS_PASSWORD")

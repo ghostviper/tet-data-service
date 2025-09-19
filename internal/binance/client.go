@@ -2,9 +2,6 @@ package binance
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,8 +16,6 @@ import (
 )
 
 type Client struct {
-	apiKey     string
-	secretKey  string
 	baseURL    string
 	httpClient *http.Client
 	limiter    *rate.Limiter
@@ -47,10 +42,8 @@ type SymbolInfo struct {
 	Status string `json:"status"`
 }
 
-func NewClient(apiKey, secretKey, baseURL string, requestsPerSecond int) *Client {
+func NewClient(baseURL string, requestsPerSecond int) *Client {
 	return &Client{
-		apiKey:    apiKey,
-		secretKey: secretKey,
 		baseURL:   baseURL,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -59,15 +52,8 @@ func NewClient(apiKey, secretKey, baseURL string, requestsPerSecond int) *Client
 	}
 }
 
-// 签名生成
-func (c *Client) sign(query string) string {
-	mac := hmac.New(sha256.New, []byte(c.secretKey))
-	mac.Write([]byte(query))
-	return hex.EncodeToString(mac.Sum(nil))
-}
-
 // 发送HTTP请求
-func (c *Client) sendRequest(ctx context.Context, endpoint string, params url.Values, signed bool) ([]byte, error) {
+func (c *Client) sendRequest(ctx context.Context, endpoint string, params url.Values) ([]byte, error) {
 	// 速率限制
 	if err := c.limiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("rate limit error: %w", err)
@@ -75,16 +61,6 @@ func (c *Client) sendRequest(ctx context.Context, endpoint string, params url.Va
 
 	// 构建URL
 	fullURL := c.baseURL + endpoint
-
-	if signed {
-		// 添加时间戳
-		params.Set("timestamp", strconv.FormatInt(time.Now().UnixMilli(), 10))
-
-		// 生成签名
-		query := params.Encode()
-		signature := c.sign(query)
-		params.Set("signature", signature)
-	}
 
 	if len(params) > 0 {
 		fullURL += "?" + params.Encode()
@@ -94,11 +70,6 @@ func (c *Client) sendRequest(ctx context.Context, endpoint string, params url.Va
 	req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// 添加API Key头部
-	if c.apiKey != "" {
-		req.Header.Set("X-MBX-APIKEY", c.apiKey)
 	}
 
 	// 发送请求
@@ -124,7 +95,7 @@ func (c *Client) sendRequest(ctx context.Context, endpoint string, params url.Va
 func (c *Client) GetExchangeInfo(ctx context.Context) (*ExchangeInfo, error) {
 	params := url.Values{}
 
-	data, err := c.sendRequest(ctx, "/api/v3/exchangeInfo", params, false)
+	data, err := c.sendRequest(ctx, "/api/v3/exchangeInfo", params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get exchange info: %w", err)
 	}
@@ -174,7 +145,7 @@ func (c *Client) GetKlines(ctx context.Context, symbol, interval string, limit i
 		params.Set("endTime", strconv.FormatInt(endTime.UnixMilli(), 10))
 	}
 
-	data, err := c.sendRequest(ctx, "/api/v3/klines", params, false)
+	data, err := c.sendRequest(ctx, "/api/v3/klines", params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get klines for %s: %w", symbol, err)
 	}
@@ -331,7 +302,7 @@ func parseInterval(interval string) time.Duration {
 func (c *Client) TestConnectivity(ctx context.Context) error {
 	params := url.Values{}
 
-	_, err := c.sendRequest(ctx, "/api/v3/ping", params, false)
+	_, err := c.sendRequest(ctx, "/api/v3/ping", params)
 	if err != nil {
 		return fmt.Errorf("connectivity test failed: %w", err)
 	}

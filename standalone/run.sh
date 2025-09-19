@@ -47,9 +47,8 @@ if [ ! -f "config.txt" ]; then
     cp config.example config.txt
     echo ""
     echo "Please edit config.txt with your settings:"
-    echo "1. Set your Binance API Key and Secret Key"
-    echo "2. Configure Redis connection settings"
-    echo "3. Adjust update parameters as needed"
+    echo "1. Configure Redis connection settings"
+    echo "2. Adjust update parameters as needed"
     echo ""
     echo "You can edit the file with:"
     echo "  nano config.txt    (or vim, gedit, etc.)"
@@ -92,14 +91,6 @@ echo ""
 
 # 构建命令行参数
 ARGS=""
-
-if [ ! -z "$BINANCE_API_KEY" ]; then
-    ARGS="$ARGS --api-key=$BINANCE_API_KEY"
-fi
-
-if [ ! -z "$BINANCE_SECRET_KEY" ]; then
-    ARGS="$ARGS --secret-key=$BINANCE_SECRET_KEY"
-fi
 
 if [ ! -z "$REDIS_ADDR" ]; then
     ARGS="$ARGS --redis=$REDIS_ADDR"

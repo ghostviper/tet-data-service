@@ -21,9 +21,8 @@ if not exist "config.txt" (
     copy config.example config.txt
     echo.
     echo Please edit config.txt with your settings:
-    echo 1. Set your Binance API Key and Secret Key
-    echo 2. Configure Redis connection settings
-    echo 3. Adjust update parameters as needed
+    echo 1. Configure Redis connection settings
+    echo 2. Adjust update parameters as needed
     echo.
     echo Opening config.txt for editing...
     notepad config.txt
@@ -64,8 +63,6 @@ for /f "usebackq tokens=1,2 delims==" %%a in ("config.txt") do (
 
 :: 启动程序
 tet-data-service-windows-amd64.exe ^
-    --api-key=%BINANCE_API_KEY% ^
-    --secret-key=%BINANCE_SECRET_KEY% ^
     --redis=%REDIS_ADDR% ^
     --redis-db=%REDIS_DB% ^
     --interval=%UPDATE_INTERVAL% ^

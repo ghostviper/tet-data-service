@@ -58,13 +58,13 @@ chmod +x run.sh
 
 # Or run directly:
 # Windows:
-tet-data-service-windows-amd64.exe --api-key=your_key --secret-key=your_secret
+tet-data-service-windows-amd64.exe
 
 # Linux:
-./tet-data-service-linux-amd64 --api-key=your_key --secret-key=your_secret
+./tet-data-service-linux-amd64
 
 # macOS:
-./tet-data-service-darwin-amd64 --api-key=your_key --secret-key=your_secret
+./tet-data-service-darwin-amd64
 ```
 
 ### Method 2: Using Docker (Recommended for Production)
@@ -76,10 +76,11 @@ cd tet-data-service
 cp .env.example .env
 ```
 
-2. Edit `.env` file with your Binance API credentials:
+2. (Optional) Adjust `.env` with your preferred settings:
 ```bash
-BINANCE_API_KEY=your_api_key_here
-BINANCE_SECRET_KEY=your_secret_key_here
+# Example overrides
+BINANCE_BASE_URL=https://api.binance.com
+TIMEFRAME=15m
 ```
 
 3. Start the service:
@@ -115,8 +116,7 @@ All configuration is handled through environment variables. See `.env.example` f
 - `TIMEFRAME`: Kline timeframe - 15m, 30m, 1h, 2h, 4h, 1d (default: 15m)
 
 ### API Configuration
-- `BINANCE_API_KEY`: Your Binance API key (required)
-- `BINANCE_SECRET_KEY`: Your Binance secret key (required)
+- `BINANCE_BASE_URL`: Binance API base URL (default: https://api.binance.com)
 - `API_REQUESTS_PER_SEC`: API rate limit (default: 15/second)
 
 ### Redis Configuration
@@ -132,8 +132,6 @@ All configuration is handled through environment variables. See `.env.example` f
 ./tet-data-service-platform-arch [options]
 
 Options:
-  --api-key string       Binance API Key (required)
-  --secret-key string    Binance Secret Key (required)
   --redis string         Redis server address (default "localhost:6379")
   --redis-db int         Redis database number (default 1)
   --interval int         Update interval in seconds (default 180)
@@ -313,7 +311,7 @@ The service includes comprehensive error handling:
 
 ## Security Considerations
 
-- **API Keys**: Store securely using environment variables or secrets management
+- **Public Data Only**: Service relies on Binance public endpoints; API keys are not required
 - **Redis**: Configure authentication if accessible externally
 - **Network**: Use VPC/firewall rules to restrict access
 - **Monitoring**: Log access attempts and API usage
@@ -329,19 +327,15 @@ This project is part of the TET Framework - check the main project for licensing
 #### Basic Usage
 ```bash
 # Windows - Basic setup
-tet-data-service-windows-amd64.exe --api-key=your_key --secret-key=your_secret
+tet-data-service-windows-amd64.exe
 
 # Linux - Remote Redis
 ./tet-data-service-linux-amd64 \
-  --api-key=your_key \
-  --secret-key=your_secret \
   --redis=192.168.1.100:6379 \
   --redis-db=2
 
 # Custom symbols and timeframe
 ./tet-data-service-linux-amd64 \
-  --api-key=your_key \
-  --secret-key=your_secret \
   --symbols="BTC/USDT,ETH/USDT,BNB/USDT" \
   --timeframe=5m \
   --interval=60
@@ -351,8 +345,8 @@ tet-data-service-windows-amd64.exe --api-key=your_key --secret-key=your_secret
 ```bash
 # Run in background (Linux)
 nohup ./tet-data-service-linux-amd64 \
-  --api-key=your_key \
-  --secret-key=your_secret > tet-service.log 2>&1 &
+  --redis=localhost:6379 \
+  --interval=180 > tet-service.log 2>&1 &
 
 # Create systemd service
 sudo systemctl enable tet-data-service
@@ -362,9 +356,8 @@ sudo systemctl start tet-data-service
 #### Configuration File Method
 ```bash
 # Create config.txt with your settings
-echo "BINANCE_API_KEY=your_key" > config.txt
-echo "BINANCE_SECRET_KEY=your_secret" >> config.txt
-echo "REDIS_ADDR=localhost:6379" >> config.txt
+echo "REDIS_ADDR=localhost:6379" > config.txt
+echo "TIMEFRAME=15m" >> config.txt
 
 # Run with config file
 ./tet-data-service-linux-amd64 --config=config.txt

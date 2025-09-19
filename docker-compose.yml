@@ -6,8 +6,7 @@ services:
     container_name: tet-data-service
     restart: unless-stopped
     environment:
-      - BINANCE_API_KEY=${BINANCE_API_KEY}
-      - BINANCE_SECRET_KEY=${BINANCE_SECRET_KEY}
+      - BINANCE_BASE_URL=${BINANCE_BASE_URL:-https://api.binance.com}
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - REDIS_DB=${REDIS_DB:-1}
