@@ -43,8 +43,6 @@ type ResourceUsage struct {
 func New(cfg *config.Config) (*DataUpdater, error) {
 	// 创建Binance客户端
 	binanceClient := binance.NewClient(
-		cfg.BinanceAPIKey,
-		cfg.BinanceSecretKey,
 		cfg.BinanceBaseURL,
 		cfg.APIRequestsPerSec,
 	)

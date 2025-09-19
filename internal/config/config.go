@@ -12,9 +12,7 @@ import (
 
 type Config struct {
 	// Binance API配置
-	BinanceAPIKey    string
-	BinanceSecretKey string
-	BinanceBaseURL   string
+	BinanceBaseURL string
 
 	// Redis配置
 	RedisAddr     string
@@ -82,14 +80,6 @@ func Load(configPath string) (*Config, error) {
 		SuccessRecoveryRate:      getEnvFloat("SUCCESS_RECOVERY_RATE", 0.9),
 		MarketHoursOptimization:  getEnvBool("MARKET_HOURS_OPTIMIZATION", true),
 		OffPeakMultiplier:        getEnvFloat("OFF_PEAK_MULTIPLIER", 2.0),
-	}
-
-	// 必需的配置项检查
-	cfg.BinanceAPIKey = os.Getenv("BINANCE_API_KEY")
-	cfg.BinanceSecretKey = os.Getenv("BINANCE_SECRET_KEY")
-
-	if cfg.BinanceAPIKey == "" || cfg.BinanceSecretKey == "" {
-		return nil, fmt.Errorf("BINANCE_API_KEY and BINANCE_SECRET_KEY must be set")
 	}
 
 	// 加载交易对列表
