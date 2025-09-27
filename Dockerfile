@@ -1,54 +1,48 @@
+# syntax=docker/dockerfile:1.7
+
+########################
 # Build stage
-FROM golang:1.21-alpine AS builder
+########################
+FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS builder
 
-# Install dependencies
-RUN apk add --no-cache git ca-certificates
+WORKDIR /src
 
-# Set working directory
-WORKDIR /app
-
-# Copy go mod files
-COPY go.mod go.sum ./
-
-# Download dependencies
+# Cache Go modules separately for faster incremental builds; go.sum may be absent locally
+COPY go.mod go.sum* ./
 RUN go mod download
 
-# Copy source code
+# Copy the rest of the source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o tet-data-service ./cmd/server
+# Configure target platform (defaults provided by Docker BuildKit)
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+ENV CGO_ENABLED=0 \
+    GOOS=${TARGETOS:-linux} \
+    GOARCH=${TARGETARCH:-amd64}
 
-# Final stage
-FROM alpine:latest
+# GOARM is only relevant for arm architecture
+ENV GOARM=${TARGETVARIANT#v}
 
-# Install certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates tzdata
+RUN go build -trimpath -ldflags="-s -w" -o /out/tet-data-service ./cmd/server
 
-# Create app user
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+########################
+# Runtime stage
+########################
+FROM alpine:3.20
 
-WORKDIR /root/
+RUN apk add --no-cache ca-certificates tzdata \
+    && adduser -D -H -s /sbin/nologin tet
 
-# Copy binary from builder stage
-COPY --from=builder /app/tet-data-service .
+WORKDIR /app
 
-# Copy configuration example
-COPY --from=builder /app/.env.example .
+COPY --from=builder /out/tet-data-service /app/tet-data-service
+COPY .env.example /app/.env.example
 
-# Change ownership
-RUN chown -R appuser:appgroup /root/
+USER tet
 
-# Switch to app user
-USER appuser
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD pgrep tet-data-service || exit 1
-
-# Expose port (if needed for future web interface)
 EXPOSE 8080
 
-# Command to run
-CMD ["./tet-data-service"]
+ENTRYPOINT ["/app/tet-data-service"]
+# Override with `docker run ... --config /app/.env.example` if desired
