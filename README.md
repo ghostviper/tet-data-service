@@ -1,211 +1,89 @@
-# TET Data Service
+# TET 数据服务
 
-A high-performance, standalone data fetching service for the TET Framework. This Go-based service is designed to be deployed independently to fetch cryptocurrency market data from Binance and store it in Redis for use by TET analysis systems.
+面向 TET 框架的高性能 Go 服务，用于获取与流式处理加密货币市场数据。服务从 Binance U 本位合约拉取 K 线，写入 Redis，并新增了实时订单簿信号、清算事件与持仓量（OI）历史，全栈由 Go 实现，便于一体化部署与维护。
 
-## Features
+## 特性
+- 并发 K 线更新，内置速率限制与自适应调度。
+- Redis 缓存与新鲜度监控，系统状态统计。
+- 实时订单簿信号（3 个价差区间的深度/压力指标，按分钟聚合）。
+- U 本位清算实时流，按分钟聚合多/空清算规模。
+- OI 历史拉取与存储，便于波动/换手分析。
+- Docker 支持与结构化日志。
 
-- **High-Performance Data Fetching**: Concurrent data fetching with configurable rate limiting
-- **Intelligent Caching**: Redis-based caching with data freshness monitoring
-- **Adaptive Intervals**: Dynamic update interval adjustment based on market conditions
-- **Comprehensive Monitoring**: Built-in health checks and performance metrics
-- **Production Ready**: Docker containerization with proper error handling and logging
-- **Scalable Architecture**: Designed for easy deployment across multiple servers
+## 架构
+- `internal/binance/`：U 本位 REST 客户端（klines、exchangeInfo、OI 历史）。
+- `internal/updater/`：调度与批量更新（全量/增量策略、对齐刷新）。
+- `internal/redis/`：Redis 客户端、K 线存储、ZSET 辅助方法。
+- `internal/services/orderbook/`：深度 WS + REST 快照 → 分钟级信号。
+- `internal/services/liquidation/`：`!forceOrder@arr` → 多/空分钟桶聚合。
+- `internal/services/oi/`：OI 历史轮询 → ZSET 存储。
+- `cmd/server/`：入口与运行参数。
 
-## Quick Start
-
-### Method 1: Standalone Compilation (Recommended for Simple Deployment)
-
-This method creates a single executable file that can run anywhere without dependencies.
-
-1. **Compile the application:**
+## 快速开始
 ```bash
-# Navigate to standalone directory
-cd tet-data-service/standalone
-
-# Windows users
-build.bat
-
-# Linux/macOS users
-chmod +x build.sh
-./build.sh
+make dev-setup     # 安装依赖与工具，创建 .env
+make run-dev       # 构建并以调试日志运行
+# 或
+make build && ./bin/tet-data-service --log-level=info
 ```
 
-This creates platform-specific executables:
-- `tet-data-service-windows-amd64.exe` (Windows 64-bit)
-- `tet-data-service-linux-amd64` (Linux 64-bit)
-- `tet-data-service-darwin-amd64` (macOS Intel)
-- `tet-data-service-darwin-arm64` (macOS M1/M2)
+## 配置（.env）
+- `REDIS_ADDR`（默认 `localhost:6379`）、`REDIS_DB`（默认 `1`）、`REDIS_PASSWORD`。
+- `BINANCE_BASE_URL`（默认 `https://fapi.binance.com`）、`API_REQUESTS_PER_SEC`（默认 `15`）。
+- `CONCURRENT_REQUESTS`（默认 `12`）、`MAX_DATA_AGE` 秒（默认 `540`）。
+- `TIMEFRAME`（默认 `15m`）、`TIMEFRAMES`（逗号分隔）、`SYMBOLS`（`BTC/USDT` 风格）。
 
-2. **Configure the service:**
-```bash
-# Copy configuration template
-cp config.example config.txt
+## 服务开关（通过 .env 设置）
+- 订单簿：`ORDERBOOK_ENABLED=true`，`ORDERBOOK_KEEP_HOURS=2`
+- 清算流：`LIQUIDATION_ENABLED=true`，`LIQUIDATION_KEEP_HOURS=24`
+- OI 更新：`OI_ENABLED=false`，`OI_PERIOD=5m`，`OI_INTERVAL=300`
 
-# Edit with your settings (required: Binance API keys)
-notepad config.txt  # Windows
-nano config.txt     # Linux/macOS
+示例 `.env` 片段：
+```dotenv
+ORDERBOOK_ENABLED=true
+ORDERBOOK_KEEP_HOURS=2
+LIQUIDATION_ENABLED=true
+LIQUIDATION_KEEP_HOURS=24
+OI_ENABLED=false
+OI_PERIOD=5m
+OI_INTERVAL=300
+VOLATILITY_ENABLED=true
+VOLATILITY_TIMEFRAME=1h
+VOLATILITY_INTERVAL=300
 ```
 
-3. **Run the service:**
+## Docker
 ```bash
-# Using startup scripts (recommended)
-# Windows:
-run.bat
-
-# Linux/macOS:
-chmod +x run.sh
-./run.sh
-
-# Or run directly:
-# Windows:
-tet-data-service-windows-amd64.exe
-
-# Linux:
-./tet-data-service-linux-amd64
-
-# macOS:
-./tet-data-service-darwin-amd64
-```
-
-### Method 2: Using Docker (Recommended for Production)
-
-1. Clone and setup:
-```bash
-git clone <repository>
-cd tet-data-service
 cp .env.example .env
-```
-
-2. (Optional) Adjust `.env` with your preferred settings:
-```bash
-# Example overrides
-BINANCE_BASE_URL=https://api.binance.com
-TIMEFRAME=15m
-```
-
-3. Start the service:
-```bash
 docker-compose up -d
-```
-
-### Method 3: Local Development
-
-1. Install dependencies:
-```bash
-make dev-setup
-```
-
-2. Configure environment:
-```bash
-# Edit .env file with your configuration
-```
-
-3. Run the service:
-```bash
-make run-dev
-```
-
-## Configuration
-
-All configuration is handled through environment variables. See `.env.example` for all available options:
-
-### Core Settings
-- `UPDATE_INTERVAL`: Data update frequency (default: 180 seconds)
-- `CONCURRENT_REQUESTS`: Number of concurrent API requests (default: 12)
-- `MAX_DATA_AGE`: Maximum acceptable data age (default: 540 seconds)
-- `TIMEFRAME`: Kline timeframe - 15m, 30m, 1h, 2h, 4h, 1d (default: 15m)
-
-### API Configuration
-- `BINANCE_BASE_URL`: Binance API base URL (default: https://api.binance.com)
-- `API_REQUESTS_PER_SEC`: API rate limit (default: 15/second)
-
-### Redis Configuration
-- `REDIS_ADDR`: Redis server address (default: localhost:6379)
-- `REDIS_PASSWORD`: Redis password (optional)
-- `REDIS_DB`: Redis database number (default: 1)
-
-## Usage
-
-### Standalone Executable Command Line Options
-
-```bash
-./tet-data-service-platform-arch [options]
-
-Options:
-  --redis string         Redis server address (default "localhost:6379")
-  --redis-db int         Redis database number (default 1)
-  --interval int         Update interval in seconds (default 180)
-  --concurrent int       Concurrent request count (default 12)
-  --max-age int         Maximum data age in seconds (default 540)
-  --timeframe string    Kline timeframe (default "15m")
-  --symbols string      Custom symbols (comma-separated)
-  --config string       Config file path (optional)
-```
-
-### Modular Service Command Line Options
-
-```bash
-./tet-data-service [options]
-
-Options:
-  --config string        Configuration file path (default ".env")
-  --interval int         Update interval in seconds (default 180)
-  --concurrent int       Concurrent request count (default 12)
-  --max-age int         Maximum data age in seconds (default 540)
-  --timeframe string    Kline timeframe (default "15m")
-  --log-level string    Log level: debug, info, warn, error (default "info")
-```
-
-### Docker Deployment
-
-#### Development
-```bash
-docker-compose up -d
-```
-
-#### Production
-```bash
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-### Monitoring
-
-#### View Logs
-```bash
-# Docker
 docker-compose logs -f tet-data-service
-
-# Local
-tail -f tet-data-service.log
 ```
 
-#### Redis Commander (Web UI)
-Access Redis web interface at `http://localhost:8081`
+## Redis 键模式
+- K 线：`tet:kline:{timeframe}:{symbol}`；时间戳：`tet:timestamp:{timeframe}:{symbol}`；系统状态：`tet:system:status[:timeframe]`。
+- 订单簿信号：`orderbook_signals:{symbol}:depth_{i}`（ZSET；score=分钟时间戳；value=JSON）。
+- 清算：原始 `liquidation:{symbol}`；聚合 `liquidation_long:{symbol}` 与 `liquidation_short:{symbol}`（按分钟 ZINCRBY）。
+- OI：`open_interest:{symbol}`（ZSET；score=毫秒时间戳；value=JSON）。
+- 波动性：`tet:volatility:{symbol}`（JSON；TTL 30m）；排行榜：`tet:volatility:ranking`（ZSET；score=综合波动评分）。
 
-#### Health Check
-The service includes built-in health checks for:
-- Redis connectivity
-- Binance API connectivity
-- Symbol validation
+## 监控与健康检查
+- 日志级别：`--log-level=debug|info|warn|error`。
+- 启动时执行 Redis 与 Binance 连接性检查。可用时运行 `make health` 进行 HTTP 健康探测。
 
-## Data Storage Format
+## 故障排查
+- Redis 连接：检查 `REDIS_ADDR` 与本地服务（`redis-server`）。
+- Binance 速率：下调 `API_REQUESTS_PER_SEC` 或减少 `CONCURRENT_REQUESTS`。
+- 交易对格式：`.env` 中使用 `BTC/USDT` 风格，内部会自动转换为 Binance 格式。
 
-Data is stored in Redis with the following key patterns:
-
-```
-tet:kline:{timeframe}:{symbol}     # OHLCV data
-tet:timestamp:{timeframe}:{symbol} # Last update timestamp
-tet:system:status                  # System status and metrics
-```
 
 ### Data Structure
 ```json
 {
-  "ohlcv_data": "JSON string of OHLCV data indexed by timestamp",
-  "last_candle_time": "2024-01-01T12:00:00Z",
-  "last_update": "2024-01-01T12:00:00Z",
-  "data_start": "2023-12-02T00:00:00Z",
-  "data_end": "2024-01-01T12:00:00Z",
+  "ohlcv_data": "{\"1757002500000\":{\"close\":\"179.34\",\"high\":\"179.36\",\"low\":\"175.55\",\"open\":\"175.89\",\"timestamp\":1757002500000,\"volume\":\"205835.192\"},\"1757006100000\":{\"close\":\"177.6\",\"high\":\"179.66\",\"low\":\"177.21\",\"open\":\"179.35\",\"timestamp\":1757006100000,\"volume\":\"275884.101\"}}",
+  "last_candle_time": "2024-01-01T12:00:00.000",
+  "last_update": "2024-01-01T12:00:00.000",
+  "data_start": "2023-12-02T00:00:00.000",
+  "data_end": "2024-01-01T12:00:00.000",
   "data_completeness": 0.95,
   "candle_count": 2880,
   "timeframe": "15m",

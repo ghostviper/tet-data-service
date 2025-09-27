@@ -1,31 +1,37 @@
 package main
 
 import (
-	"context"
-	"flag"
-	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
+    "context"
+    "flag"
+    "fmt"
+    "os"
+    "os/signal"
+    "strings"
+    "syscall"
+    "time"
 
-	"tet-data-service/internal/config"
-	"tet-data-service/internal/updater"
-	"tet-data-service/pkg/logger"
+    "tet-data-service/internal/config"
+    "tet-data-service/internal/services/liquidation"
+    "tet-data-service/internal/services/oi"
+    "tet-data-service/internal/services/orderbook"
+    "tet-data-service/internal/services/volatility"
+    "tet-data-service/internal/updater"
+    "tet-data-service/pkg/logger"
 
-	"github.com/sirupsen/logrus"
+    "github.com/sirupsen/logrus"
 )
 
 func main() {
 	// 命令行参数
-	var (
-		configPath   = flag.String("config", ".env", "Configuration file path")
-		interval     = flag.Int("interval", 180, "Update interval in seconds")
-		concurrent   = flag.Int("concurrent", 12, "Concurrent request count")
-		maxAge       = flag.Int("max-age", 540, "Maximum data age in seconds")
-		timeframe    = flag.String("timeframe", "15m", "Kline timeframe (15m, 30m, 1h, 2h, 4h, 1d)")
-		logLevel     = flag.String("log-level", "info", "Log level (debug, info, warn, error)")
-	)
+    var (
+        configPath = flag.String("config", ".env", "Configuration file path")
+        concurrent = flag.Int("concurrent", 12, "Concurrent request count")
+        maxAge     = flag.Int("max-age", 540, "Maximum data age in seconds")
+        timeframe  = flag.String("timeframe", "15m", "Single timeframe override (deprecated, use --timeframes)")
+        timeframes = flag.String("timeframes", "", "Comma-separated list of timeframes (e.g. 1m,5m,15m)")
+        logLevel   = flag.String("log-level", "info", "Log level (debug, info, warn, error)")
+        // No per-service flags; use .env toggles in config
+    )
 	flag.Parse()
 
 	// 初始化日志
@@ -41,22 +47,28 @@ func main() {
 	}
 
 	// 应用命令行参数覆盖配置
-	if *interval != 180 {
-		cfg.UpdateInterval = time.Duration(*interval) * time.Second
-	}
 	if *concurrent != 12 {
 		cfg.ConcurrentRequests = *concurrent
 	}
 	if *maxAge != 540 {
 		cfg.MaxDataAge = time.Duration(*maxAge) * time.Second
 	}
-	if *timeframe != "15m" {
+	if *timeframes != "" {
+		cfg.Timeframes = parseCLIList(*timeframes)
+		if len(cfg.Timeframes) > 0 {
+			cfg.Timeframe = cfg.Timeframes[0]
+		}
+	} else if *timeframe != "15m" {
+		cfg.Timeframes = []string{*timeframe}
 		cfg.Timeframe = *timeframe
+	}
+	if len(cfg.Timeframes) == 0 {
+		cfg.Timeframes = []string{cfg.Timeframe}
 	}
 
 	logrus.Info("Starting TET Real-Time Data Service...")
-	logrus.Infof("Configuration: interval=%v, concurrent=%d, max-age=%v, timeframe=%s",
-		cfg.UpdateInterval, cfg.ConcurrentRequests, cfg.MaxDataAge, cfg.Timeframe)
+	logrus.Infof("Configuration: concurrent=%d, max-age=%v, timeframes=%v",
+		cfg.ConcurrentRequests, cfg.MaxDataAge, cfg.Timeframes)
 
 	// 创建更新服务
 	dataUpdater, err := updater.New(cfg)
@@ -90,10 +102,40 @@ func main() {
 	}()
 
 	// 启动数据更新服务
+	// Start fused Python-equivalent services in Go
+    if cfg.OrderbookEnabled {
+        ob := orderbook.New(dataUpdater.Redis(), cfg.Symbols, cfg.OrderbookKeepHours)
+        _ = ob.Start(ctx)
+    }
+    if cfg.LiquidationEnabled {
+        liq := liquidation.New(dataUpdater.Redis(), cfg.LiquidationKeepHours)
+        _ = liq.Start(ctx)
+    }
+    if cfg.OIEnabled {
+        oiSvc := oi.New(dataUpdater.Binance(), dataUpdater.Redis(), cfg.Symbols, cfg.OIPeriod, cfg.OIIntervalSec)
+        _ = oiSvc.Start(ctx)
+    }
+    if cfg.VolatilityEnabled {
+        vol := volatility.New(dataUpdater.Redis(), cfg.Symbols, cfg.VolatilityTimeframe, cfg.VolatilityIntervalSec)
+        _ = vol.Start(ctx)
+    }
+
 	if err := dataUpdater.Start(ctx); err != nil {
 		logrus.Errorf("Data updater stopped with error: %v", err)
 		os.Exit(1)
 	}
 
 	logrus.Info("TET Real-Time Data Service stopped")
+}
+
+func parseCLIList(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		clean := strings.TrimSpace(part)
+		if clean != "" {
+			result = append(result, clean)
+		}
+	}
+	return result
 }

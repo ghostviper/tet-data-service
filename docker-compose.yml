@@ -1,62 +1,9 @@
-version: '3.8'
-
 services:
   tet-data-service:
     build: .
     container_name: tet-data-service
     restart: unless-stopped
-    environment:
-      - BINANCE_BASE_URL=${BINANCE_BASE_URL:-https://api.binance.com}
-      - REDIS_ADDR=redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      - REDIS_DB=${REDIS_DB:-1}
-      - UPDATE_INTERVAL=${UPDATE_INTERVAL:-180}
-      - CONCURRENT_REQUESTS=${CONCURRENT_REQUESTS:-12}
-      - MAX_DATA_AGE=${MAX_DATA_AGE:-540}
-      - TIMEFRAME=${TIMEFRAME:-15m}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-    depends_on:
-      - redis
+    env_file:
+      - .env
     volumes:
       - ./logs:/root/logs
-    networks:
-      - tet-network
-    command: ["./tet-data-service", "--config", ".env"]
-
-  redis:
-    image: redis:7-alpine
-    container_name: tet-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-      - ./redis.conf:/usr/local/etc/redis/redis.conf
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
-    networks:
-      - tet-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: tet-redis-commander
-    restart: unless-stopped
-    environment:
-      - REDIS_HOSTS=local:redis:6379
-    ports:
-      - "8081:8081"
-    depends_on:
-      - redis
-    networks:
-      - tet-network
-
-volumes:
-  redis-data:
-
-networks:
-  tet-network:
-    driver: bridge
